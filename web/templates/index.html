@@ -10,10 +10,10 @@
   <main class="page">
     <section class="panel left">
       <h1>SQL Agent RAG</h1>
-      <p class="muted">Generación de SQL con Ollama vía OpenAI-compatible, contexto comprimido y validación.</p>
+      <p class="muted">Generación de SQL con Ollama vía OpenAI-compatible, contexto comprimido, uso forzado de DIM_FECHA y validación.</p>
 
       <label for="question">Pregunta</label>
-      <textarea id="question" rows="7" placeholder="Ejemplo: ventas por mes y categoría contable en 2025"></textarea>
+      <textarea id="question" rows="7" placeholder="Ejemplo: ventas por canal y marca"></textarea>
 
       <div class="row">
         <div class="field">
@@ -24,6 +24,10 @@
           <input id="autorepair" type="checkbox" checked>
           Intentar corrección automática
         </label>
+      </div>
+
+      <div class="note">
+        Reglas activas: contexto máximo 2500 caracteres, uso de columnas NOM_/DESC_ para búsqueda y respuesta, y rango por defecto desde enero de 2025 hasta hoy usando DIM_FECHA.
       </div>
 
       <div class="actions">
@@ -37,6 +41,17 @@
       <div class="block">
         <h2>SQL</h2>
         <pre id="sql"></pre>
+      </div>
+
+      <div class="grid-two">
+        <div class="block">
+          <h2>Tablas utilizadas</h2>
+          <pre id="tablesUsed"></pre>
+        </div>
+        <div class="block">
+          <h2>Columnas NOM_/DESC_ priorizadas</h2>
+          <pre id="nameColumns"></pre>
+        </div>
       </div>
 
       <div class="grid-two">
@@ -93,6 +108,8 @@
       $('prompt').textContent = '';
       $('context').textContent = '';
       $('intent').textContent = '';
+      $('tablesUsed').textContent = '';
+      $('nameColumns').textContent = '';
       $('promptChars').textContent = '';
 
       try {
@@ -106,6 +123,12 @@
         if (!data.ok) throw new Error(data.error || 'Error desconocido');
 
         $('sql').textContent = pretty(data.sql);
+        $('tablesUsed').textContent = pretty({
+          tablas_contexto: data.selected_tables,
+          tablas_sql: data.used_tables,
+          tablas_sql_reparado: data.repaired_used_tables
+        });
+        $('nameColumns').textContent = pretty(data.preferred_name_columns);
         $('validation').textContent = pretty(data.validation);
         $('repair').textContent = pretty({
           repaired_sql: data.repaired_sql,

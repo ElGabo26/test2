@@ -41,3 +41,8 @@ cache/
 
 # Optional large generated artifacts
 vectorstore/
+
+# Flask local artifacts
+instance/
+.webassets-cache
+flask_session/

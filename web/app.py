@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import os
@@ -44,7 +43,6 @@ def index():
 def api_health():
     try:
         client = build_client(base_url=OLLAMA_BASE_URL, api_key=OLLAMA_API_KEY)
-        # Llamada ligera para verificar conectividad con Ollama
         models = client.models.list()
         names = [getattr(m, 'id', None) or getattr(m, 'model', None) for m in getattr(models, 'data', [])]
         return jsonify({
@@ -98,10 +96,14 @@ def api_generate():
                 "prompt_chars": result["prompt_chars"],
                 "intent": result["intent"],
                 "context": result["context"],
+                "selected_tables": result["selected_tables"],
+                "preferred_name_columns": result["preferred_name_columns"],
                 "sql": result["sql"],
                 "validation": validation,
+                "used_tables": validation.get("tables", []),
                 "repaired_sql": repaired_sql,
                 "repaired_validation": repaired_validation,
+                "repaired_used_tables": (repaired_validation or {}).get("tables", []) if repaired_validation else [],
             }
         )
     except Exception as exc:

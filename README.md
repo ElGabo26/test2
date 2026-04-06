@@ -1,5 +1,12 @@
-
 # SQL Agent RAG para Ollama vía OpenAI-compatible
+
+## Cambios incluidos en esta versión
+
+- contexto máximo de 2500 caracteres
+- bloque visual para tablas utilizadas en la interfaz Flask
+- priorización de columnas `NOM_*` y `DESC_*` para búsqueda y respuesta
+- rango temporal por defecto desde `2025-01-01` hasta la fecha actual
+- uso obligatorio de `DIM_FECHA` para filtrar fechas
 
 ## Arranque correcto
 
@@ -22,8 +29,6 @@ Prueba primero:
 ```text
 http://localhost:8000/api/health
 ```
-
-Si falla, revisa que Ollama esté levantado y que el modelo exista.
 
 Variables opcionales:
 - `OLLAMA_BASE_URL` por defecto: `http://localhost:11434/v1`
