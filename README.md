@@ -1,25 +1,31 @@
+
 # SQL Agent RAG para Ollama vía OpenAI-compatible
 
-Incluye catálogo, joins, reglas, ejemplos y pipeline con prompt <=1500 caracteres.
-
-
-## Interfaz Flask
-
-Ejecuta la interfaz web así:
+## Arranque correcto
 
 ```bash
-python web/app.py
+cd sql_agent_rag
+pip install -r requirements.txt
+python -m web.app
 ```
 
-Luego abre:
+Abre:
 
 ```text
 http://localhost:8000
 ```
 
-La UI permite:
-- ingresar una pregunta
-- escoger el modelo de Ollama
-- ver el prompt final y su longitud
-- revisar la validación
-- intentar corrección automática cuando falle la primera salida
+## Verificación rápida
+
+Prueba primero:
+
+```text
+http://localhost:8000/api/health
+```
+
+Si falla, revisa que Ollama esté levantado y que el modelo exista.
+
+Variables opcionales:
+- `OLLAMA_BASE_URL` por defecto: `http://localhost:11434/v1`
+- `OLLAMA_MODEL` por defecto: `qwen2.5-coder:3b`
+- `OLLAMA_API_KEY` por defecto: `ollama`
