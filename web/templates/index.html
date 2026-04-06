@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SQL Agent RAG</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <main class="page">
+    <section class="panel left">
+      <h1>SQL Agent RAG</h1>
+      <p class="muted">Generación de SQL con Ollama vía OpenAI-compatible, contexto comprimido y validación.</p>
+
+      <label for="question">Pregunta</label>
+      <textarea id="question" rows="7" placeholder="Ejemplo: ventas por mes y categoría contable en 2025"></textarea>
+
+      <div class="row">
+        <div class="field">
+          <label for="model">Modelo</label>
+          <input id="model" value="{{ default_model }}">
+        </div>
+        <label class="check">
+          <input id="autorepair" type="checkbox" checked>
+          Intentar corrección automática
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="runBtn">Generar SQL</button>
+      </div>
+
+      <div id="status" class="status">Listo.</div>
+    </section>
+
+    <section class="panel right">
+      <div class="block">
+        <h2>SQL</h2>
+        <pre id="sql"></pre>
+      </div>
+
+      <div class="grid-two">
+        <div class="block">
+          <h2>Validación</h2>
+          <pre id="validation"></pre>
+        </div>
+        <div class="block">
+          <h2>Corrección</h2>
+          <pre id="repair"></pre>
+        </div>
+      </div>
+
+      <div class="block">
+        <h2>Prompt <span id="promptChars"></span></h2>
+        <pre id="prompt"></pre>
+      </div>
+
+      <div class="block">
+        <h2>Contexto seleccionado</h2>
+        <pre id="context"></pre>
+      </div>
+
+      <div class="block">
+        <h2>Intención normalizada</h2>
+        <pre id="intent"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function pretty(value) {
+      if (value == null || value === '') return '—';
+      if (typeof value === 'string') return value;
+      return JSON.stringify(value, null, 2);
+    }
+
+    async function generate() {
+      const question = $('question').value.trim();
+      const model = $('model').value.trim();
+      const autorepair = $('autorepair').checked;
+
+      if (!question) {
+        $('status').textContent = 'Ingresa una pregunta.';
+        return;
+      }
+
+      $('status').textContent = 'Generando...';
+      $('sql').textContent = '';
+      $('validation').textContent = '';
+      $('repair').textContent = '';
+      $('prompt').textContent = '';
+      $('context').textContent = '';
+      $('intent').textContent = '';
+      $('promptChars').textContent = '';
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question, model, autorepair})
+        });
+
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Error desconocido');
+
+        $('sql').textContent = pretty(data.sql);
+        $('validation').textContent = pretty(data.validation);
+        $('repair').textContent = pretty({
+          repaired_sql: data.repaired_sql,
+          repaired_validation: data.repaired_validation
+        });
+        $('prompt').textContent = pretty(data.prompt);
+        $('context').textContent = pretty(data.context);
+        $('intent').textContent = pretty(data.intent);
+        $('promptChars').textContent = `(${data.prompt_chars} caracteres)`;
+        $('status').textContent = 'Completado.';
+      } catch (err) {
+        $('status').textContent = `Error: ${err.message}`;
+      }
+    }
+
+    $('runBtn').addEventListener('click', generate);
+  </script>
+</body>
+</html>

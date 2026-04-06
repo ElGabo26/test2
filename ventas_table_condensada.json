@@ -1,0 +1,1757 @@
+{
+  "table_name": "DDM_ERP.FAC_VENTA_TOTAL",
+  "source_aliases_detected": [
+    "FVT",
+    "FAC_VENTA_TOTAL"
+  ],
+  "table_description": "Tabla de hechos de ventas del ERP. Registra transacciones comerciales con claves hacia producto, cliente, documento, compañía, unidad de negocio y fecha, además de métricas de cantidades, pesos, cajas, valores monetarios, devoluciones, notas de crédito/débito, costos e indicadores de margen. En las consultas adjuntas se usa como tabla principal para resumir ventas, cantidades y costos por fecha, categoría contable y canal de venta.",
+  "source_evidence": {
+    "description_source_file": "tablesDescription.xlsx / FAC_VENTAS_TOTAL EEFF.txt",
+    "schema_source_file": "tablesIndex.xlsx",
+    "join_source_file": "FAC_VENTAS_TOTAL EEFF.txt"
+  },
+  "allowed_joins": [
+    {
+      "table": "DDM_ERP.DIM_PRODUCTO",
+      "type": "LEFT JOIN",
+      "on": "DDM_ERP.FAC_VENTA_TOTAL.ID_PRODUCTO = DDM_ERP.DIM_PRODUCTO.ID_PRODUCTO",
+      "purpose": "Obtener categoría contable, familia, subclasificación, unidad de negocio y factores de peso para clasificar canales y calcular cantidades/costos."
+    },
+    {
+      "table": "DDM_ERP.DIM_TIPO_DOCUMENTO",
+      "type": "LEFT JOIN",
+      "on": "DDM_ERP.FAC_VENTA_TOTAL.ID_DOCUMENTO = DDM_ERP.DIM_TIPO_DOCUMENTO.ID_DOCUMENTO",
+      "purpose": "Clasificar ciertos documentos como exportaciones y apoyar reglas de canal de venta."
+    },
+    {
+      "table": "DDM_ERP.DIM_CLIENTE",
+      "type": "LEFT JOIN",
+      "on": "DDM_ERP.FAC_VENTA_TOTAL.ID_CLIENTE = DDM_ERP.DIM_CLIENTE.ID_CLIENTE",
+      "purpose": "Filtrar movimientos válidos y apoyar la clasificación comercial por canal, ruta o tipo de identificación."
+    },
+    {
+      "table": "DDM_ERP.DIM_FECHA",
+      "type": "LEFT JOIN",
+      "on": "DDM_ERP.FAC_VENTA_TOTAL.DATE_CONTA = DDM_ERP.DIM_FECHA.FECHA",
+      "purpose": "Transformar la fecha contable en fecha mensual para agregación."
+    },
+    {
+      "table": "DDM_ERP.DIM_UNIDAD_NEGOCIO",
+      "type": "LEFT JOIN",
+      "on": "DDM_ERP.FAC_VENTA_TOTAL.ID_UNID_NEGOCIO = DDM_ERP.DIM_UNIDAD_NEGOCIO.ID_UNID_NEGOCIO",
+      "purpose": "Apoyar reclasificación de compañía y definición de canal en el bloque agrícola."
+    },
+    {
+      "table": "DDM_ERP.FAC_COSTO_MARGEN",
+      "type": "LEFT JOIN (vía subconsulta agregada)",
+      "on": "DDM_ERP.FAC_VENTA_TOTAL.ID_PRODUCTO = FAC_COSTO_MARGEN.CODITEM AND DDM_ERP.DIM_FECHA.MES = FAC_COSTO_MARGEN.FECHA",
+      "purpose": "Recuperar COSTOXKILO para calcular costo de ventas y completar el último costo disponible por producto."
+    }
+  ],
+  "columns": [
+    {
+      "name": "ID_PRODUCTO",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del producto vendido; clave principal de cruce hacia la dimensión de productos.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_ESTADO",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del estado actual del registro o documento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_PROX_ESTADO",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del siguiente estado esperado del registro o flujo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_DOCUMENTO",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del tipo de documento comercial asociado a la transacción; se usa para clasificar exportaciones y otros movimientos.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_MONEDA",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de la moneda del documento o transacción.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_VENDEDOR",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del vendedor asociado a la venta.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_COMPANIA",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de la compañía emisora o propietaria del movimiento de venta.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_UNID_NEGOCIO",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de la unidad de negocio; se usa en ventas agrícolas para reclasificaciones y lógica de canal.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_UNIDAD",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de la unidad de medida o unidad operativa relacionada.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_CLIENTE",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del cliente de la transacción; clave principal de cruce hacia la dimensión de clientes.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_FECHA",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de fecha en el modelo dimensional; permite cruce con la dimensión de fechas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_BODEGA",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de la bodega o depósito asociado al movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DATE_CONTA",
+      "data_type": "date",
+      "nullable": true,
+      "key": null,
+      "description": "Fecha contable del movimiento de venta; se usa como fecha base para filtros y agregaciones mensuales.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_FECHA_FACT",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de la fecha de facturación.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "IVA",
+      "data_type": "varchar(2)",
+      "nullable": true,
+      "key": null,
+      "description": "Indicador o código de IVA aplicado al movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "FACTOR_CAJAS_REAL",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Factor de conversión para expresar cantidades en cajas reales.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "FACTOR_CAJA_ESTAD",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Factor de conversión para expresar cantidades en cajas estadísticas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "FACTOR_PESO",
+      "data_type": "decimal(19,7)",
+      "nullable": true,
+      "key": null,
+      "description": "Factor de peso usado para convertir unidades a kilogramos o toneladas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "PVP_UNIT",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de venta al público unitario.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_SOLICITADA",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad solicitada en el documento comercial.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_UNITARIO",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo unitario del producto.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista unitario del producto.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_UNIT",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable unitario.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_UNIT_VENTA",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio unitario efectivo de venta.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_UNIT_INVENT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo unitario de inventario.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_VENDIDA",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad efectivamente vendida.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "CANT_VENDIDA_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad efectivamente vendida. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_VEND_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de cant vend para comparación temporal. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_VEND_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de cant vend para comparación temporal. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_VEND_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de cant vend para comparación temporal. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_VEND_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de cant vend para comparación temporal. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_CANT_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de cant actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_CANT_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de cant ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DESCUENTO",
+      "data_type": "decimal(15,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de descuento aplicado al movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DESCUENTO_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de descuento aplicado al movimiento. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DESCUENTO_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de descuento aplicado al movimiento. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DESCUENTO_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de descuento aplicado al movimiento. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DESCUENTO_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de descuento aplicado al movimiento. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DESCUENTO_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de descuento aplicado al movimiento. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DESC_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de desc actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DESC_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de desc ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PVP_TOTAL",
+      "data_type": "decimal(18,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de venta al público total del movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PVP_TOT_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de pvp tot para comparación temporal. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PVP_TOT_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de pvp tot para comparación temporal. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PVP_TOT_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de pvp tot para comparación temporal. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PVP_TOT_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de pvp tot para comparación temporal. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PVP_TOT_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de pvp tot para comparación temporal. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_PVP_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de pvp actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_PVP_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de pvp ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_TOT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable total del movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de costo var para comparación temporal. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de costo var para comparación temporal. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de costo var para comparación temporal. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de costo var para comparación temporal. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_VAR_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de costo var para comparación temporal. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_COSTO_VAR_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de costo var actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_COSTO_VAR_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de costo var ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA_TOT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista total del movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista unitario del producto. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista unitario del producto. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista unitario del producto. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista unitario del producto. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_LISTA_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Precio de lista unitario del producto. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_PLISTA_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de plista actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_PLISTA_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de plista ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_VENTA_TOTAL",
+      "data_type": "decimal(18,3)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor total de venta facturado antes o junto a otros ajustes monetarios.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "PRECIO_VENTA_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de precio venta para comparación temporal. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_VENTA_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de precio venta para comparación temporal. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_VENTA_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de precio venta para comparación temporal. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_VENTA_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de precio venta para comparación temporal. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PRECIO_VENTA_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor histórico de precio venta para comparación temporal. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_PRE_VENTA_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de pre venta actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_PRE_VENTA_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de pre venta ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_KG",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en kilogramos.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "VENTA_KG_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en kilogramos. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_KG_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en kilogramos. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_KG_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en kilogramos. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_KG_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en kilogramos. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_KG_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en kilogramos. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_VENTA_KG_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de venta kg actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_VENTA_KG_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de venta kg ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_REAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas reales.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "VENTA_CAJ_REAL_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas reales. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_REAL_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas reales. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_REAL_MESANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas reales. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_REAL_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas reales. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_REAL_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas reales. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_VENTA_CAJ_REAL_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de venta caj real actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_VENTA_CAJ_REAL_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de venta caj real ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_EST",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas estadísticas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "VENTA_CAJ_EST_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas estadísticas. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_EST_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas estadísticas. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_EST_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas estadísticas. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_EST_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas estadísticas. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_CAJ_EST_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad vendida expresada en cajas estadísticas. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_VENTA_CAJ_EST_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de venta caj est actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_VENTA_CAJ_EST_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de venta caj est ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_TOT_INVENT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo total de inventario asociado a la venta.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_CRED",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de crédito.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "CANT_NOTA_CRED_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de crédito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_CRED_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de crédito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_CRED_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de crédito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_CRED_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de crédito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_CRED_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de crédito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_CANT_NOTA_CRED_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de cant nota cred actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_CANT_NOTA_CRED_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de cant nota cred ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_CRED",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de crédito.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "USD_NOTA_CRED_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de crédito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_CRED_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de crédito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_CRED_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de crédito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_CRED_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de crédito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_CRED_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de crédito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_USD_NOTA_CRED_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de usd nota cred actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_USD_NOTA_CRED_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de usd nota cred ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_DEB",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de débito.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "CANT_NOTA_DEB_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de débito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_DEB_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de débito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_DEB_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de débito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_DEB_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de débito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "CANT_NOTA_DEB_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad asociada a notas de débito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_CANT_NOTA_DEB_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de cant nota deb actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_CANT_NOTA_DEB_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de cant nota deb ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_DEB",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de débito.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "USD_NOTA_DEB_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de débito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_DEB_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de débito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_DEB_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de débito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_DEB_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de débito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "USD_NOTA_DEB_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario en USD asociado a notas de débito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_USD_NOTA_DEB_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de usd nota deb actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_USD_NOTA_DEB_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de usd nota deb ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_KG",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en kilogramos.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "DEV_KG_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en kilogramos. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_KG_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en kilogramos. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_KG_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en kilogramos. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_KG_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en kilogramos. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_KG_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en kilogramos. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_KG_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev kg actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_KG_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev kg ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_REAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas reales.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "DEV_CAJ_REAL_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas reales. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_REAL_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas reales. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_REAL_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas reales. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_REAL_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas reales. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_REAL_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas reales. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_CAJ_REAL_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev caj real actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_CAJ_REAL_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev caj real ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_EST",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas estadísticas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "DEV_CAJ_EST_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas estadísticas. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_EST_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas estadísticas. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_EST_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas estadísticas. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_EST_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas estadísticas. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_CAJ_EST_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Devoluciones expresadas en cajas estadísticas. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_CAJ_EST_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev caj est actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_CAJ_EST_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev caj est ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_COSTO_VAR",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable asociado a devoluciones.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_COSTO_VAR_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable asociado a devoluciones. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_COSTO_VAR_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable asociado a devoluciones. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_COSTO_VAR_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable asociado a devoluciones. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_COSTO_VAR_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable asociado a devoluciones. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "DEV_COSTO_VAR_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable asociado a devoluciones. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_COSTO_VAR_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev costo var actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_DEV_COSTO_VAR_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de dev costo var ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_KG",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en kilogramos asociada a notas de débito.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_KG_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en kilogramos asociada a notas de débito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_KG_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en kilogramos asociada a notas de débito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_KG_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en kilogramos asociada a notas de débito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_KG_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en kilogramos asociada a notas de débito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_KG_MES_ANIO3",
+      "data_type": "varchar(18)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en kilogramos asociada a notas de débito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_ND_KG_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de nd kg actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_ND_KG_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de nd kg ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_REAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas reales asociada a notas de débito.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_REAL_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas reales asociada a notas de débito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_REAL_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas reales asociada a notas de débito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_REAL_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas reales asociada a notas de débito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_REAL_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas reales asociada a notas de débito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_REAL_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas reales asociada a notas de débito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_ND_CAJ_REAL_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de nd caj real actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_ND_CAJ_REAL_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de nd caj real ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_EST",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas estadísticas asociada a notas de débito.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_EST_MES1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas estadísticas asociada a notas de débito. Valor del mes anterior inmediato.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_EST_MES2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas estadísticas asociada a notas de débito. Valor de dos meses atrás.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_EST_MES_ANIO1",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas estadísticas asociada a notas de débito. Valor del mismo mes del año anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_EST_MES_ANIO2",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas estadísticas asociada a notas de débito. Valor del mismo mes de hace dos años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ND_CAJ_EST_MES_ANIO3",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad en cajas estadísticas asociada a notas de débito. Valor del mismo mes de hace tres años.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_ND_CAJ_EST_ACTUAL",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de nd caj est actual. Acumulado del periodo actual.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ACUM_ND_CAJ_EST_ANT",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor acumulado de nd caj est ant. Acumulado del periodo anterior.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VALOR_IVA",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor monetario del IVA del movimiento.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "INDICADOR_DPA",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Indicador usado en cálculos de deducciones o ajustes DPA sobre ventas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "CANT_ENTREGADA",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Cantidad entregada al cliente.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_SOLICITANTE",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del solicitante del movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "NOMBRE_EMPLEADO",
+      "data_type": "varchar(25)",
+      "nullable": true,
+      "key": null,
+      "description": "Nombre del empleado asociado al registro.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTO_KILO",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo por kilogramo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOVAR_KILO",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable por kilogramo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOXUNIVENDIDAS",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo por unidad vendida.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOVARSIMUKILO",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo variable simulado por kilogramo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOSIMUXKILVENDIDOS",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo simulado por kilogramo vendido.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VENTA_AUTOCONSUMO",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de venta/autoconsumo utilizado en los agregados de ventas de las consultas adjuntas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "VALORFLETE",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor de flete imputado al movimiento.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "VALORX",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Campo monetario auxiliar del modelo fuente.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOMATPRIKIL",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo de materia prima por kilogramo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOEMPENVKIL",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo de empaque o envase por kilogramo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "COSTOINSUKIL",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Costo de insumos por kilogramo.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "PROMOCION",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Valor o indicador asociado a promociones.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "SERVICIO",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Código o indicador de servicio; participa en reglas de exclusión o ajuste en algunas vistas.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ID_SUPERVISOR",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del supervisor relacionado con la venta.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "INDICADOR_DPA_UC",
+      "data_type": "decimal(18,4)",
+      "nullable": true,
+      "key": null,
+      "description": "Indicador DPA para un caso o unidad de cálculo específica.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "FPIVA",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Factor o porcentaje de IVA aplicado.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "ID_JEFE_REGIONAL",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador del jefe regional asociado.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "UN_CON",
+      "data_type": "varchar(7)",
+      "nullable": true,
+      "key": null,
+      "description": "Unidad de control o campo operativo abreviado.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "MARGEN",
+      "data_type": "decimal(19,10)",
+      "nullable": true,
+      "key": null,
+      "description": "Margen monetario o de contribución del movimiento de venta.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "ETL_TSTAMP",
+      "data_type": "datetime",
+      "nullable": true,
+      "key": null,
+      "description": "Marca de tiempo del proceso ETL que cargó el registro.",
+      "usage_priority": "alta"
+    },
+    {
+      "name": "IDFECHATRDJ",
+      "data_type": "bigint(20)",
+      "nullable": true,
+      "key": null,
+      "description": "Identificador de fecha para un proceso o documento TRDJ.",
+      "usage_priority": "media"
+    },
+    {
+      "name": "FECHAORDENTRDJ",
+      "data_type": "datetime",
+      "nullable": true,
+      "key": null,
+      "description": "Fecha de orden o proceso TRDJ.",
+      "usage_priority": "media"
+    }
+  ]
+}
