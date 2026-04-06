@@ -10,21 +10,36 @@ from typing import Any, Dict, List, Tuple, Optional
 BASE_DIR = Path(__file__).resolve().parent.parent
 CATALOG_DIR = BASE_DIR / "catalog"
 EXAMPLES_DIR = BASE_DIR / "examples"
-MAX_PROMPT_CHARS = 2500
+MAX_PROMPT_CHARS = 3000
 DEFAULT_DATE_START = "2025-01-01"
 BUSINESS_NAME_PREFIXES = ("NOM_", "DESC_")
 CURRENT_DATE = date.today().isoformat()
 STOPWORDS = {
     "de", "la", "el", "los", "las", "del", "por", "para", "y", "o", "en", "a", "un", "una",
     "con", "sin", "que", "cuanto", "cuántos", "cual", "cuál", "mes", "año", "fecha", "hasta",
-    "desde", "hoy", "actual", "totales", "total", "ventas", "venta", "mostrar", "dame", "quiero",
-    "informe", "reporte", "nombre", "marca", "familia", "string", "buscar", "busca", "requiero"
+    "desde", "hoy", "actual", "totales", "total", "ventas", "venta", "mostrar", "muestra",
+    "dame", "quiero", "genera", "generar", "genere", "muéstrame", "muestrame",
+    "trae", "obtén", "obten", "obtener", "consulta", "solicita", "solicitud",
+    "informe", "reporte", "nombre", "marca", "familia", "string", "buscar", "busca", "requiero",
+    "estados", "financieros", "estado", "financiero", "plantacion", "plantación", "plantaciones",
+    "marcas", "familias", "clientes", "productos", "cuentas", "empresas", "companias", "compañias",
+    "unidades", "canales", "rutas", "zonas", "agencias"
 }
 TEXT_ENTITY_HINTS = {
     "marca", "familia", "empresa", "compania", "compañia", "unidad", "negocio", "cuenta", "canal",
     "ruta", "zona", "agencia", "material", "producto", "cliente", "articulo", "artículo", "linea", "línea"
 }
 EXPLICIT_AUTOCONSUMO_TERMS = {"autoconsumo", "autoconsumos", "venta_autoconsumo", "venta autoconsumo"}
+ENTITY_INTRO_WORDS = {
+    "marca", "familia", "empresa", "compania", "compañia", "unidad", "unidad de negocio", "cuenta",
+    "canal", "ruta", "zona", "agencia", "material", "producto", "cliente", "plantacion", "plantación"
+}
+REPORT_REQUEST_PATTERNS = (
+    "genera el informe", "genera informe", "genera el reporte", "genera reporte",
+    "muestra el informe", "muestra informe", "dame el informe", "dame informe",
+    "estados financieros", "estado financiero"
+)
+
 
 
 def load_json(path: Path) -> Dict[str, Any]:
@@ -94,10 +109,67 @@ def _question_tokens(question: str) -> List[str]:
 def _normalize_business_term(term: str) -> str:
     return re.sub(r"\s+", " ", term.strip()).upper()
 
+def _looks_like_instruction_phrase(text: str) -> bool:
+    low = text.lower().strip()
+    return any(pattern in low for pattern in REPORT_REQUEST_PATTERNS)
+
+
+def _clean_candidate_phrase(value: str) -> str:
+    value = re.sub(r"\b(?:desde|hasta|en|por|con|sin|y|o|del|de la|de el)\b.*$", "", value, flags=re.IGNORECASE).strip()
+    value = re.sub(r"\s+", " ", value)
+    return value.strip(" .,:;-")
+
+
 
 def _extract_search_terms(question: str) -> List[str]:
     q_low = question.lower()
     terms: List[str] = []
+
+    for quoted in re.findall(r"[\"“”'\']([^\"“”'\']{2,60})[\"“”'\']", question):
+        cleaned = _normalize_business_term(_clean_candidate_phrase(quoted))
+        if cleaned and cleaned.lower() not in STOPWORDS and cleaned not in terms:
+            terms.append(cleaned)
+
+    patterns = [
+        r"(?:marca|familia|empresa|compa(?:ñ|n)ia|unidad de negocio|unidad|cuenta|canal|ruta|zona|agencia|material|producto|cliente|plantaci(?:ó|o)n)\s+(?:de\s+|del\s+|la\s+|el\s+)?([a-zA-Z0-9áéíóúñÑ_\- ]{2,60})",
+        r"(?:que contenga|parecido a|similar a|semejante a)\s+([a-zA-Z0-9áéíóúñÑ_\- ]{2,60})",
+    ]
+    for pattern in patterns:
+        for match in re.findall(pattern, q_low, flags=re.IGNORECASE):
+            cleaned = _normalize_business_term(_clean_candidate_phrase(match))
+            if not cleaned:
+                continue
+            if cleaned.lower() in STOPWORDS:
+                continue
+            if _looks_like_instruction_phrase(cleaned):
+                continue
+            if cleaned not in terms:
+                terms.append(cleaned)
+
+    if terms:
+        return terms[:4]
+
+    has_entity_hint = any(hint in q_low for hint in ENTITY_INTRO_WORDS) or any(ch in question for ch in ['"', "'", "“", "”"])
+    if not has_entity_hint:
+        return []
+
+    tokens = [
+        t for t in _question_tokens(question)
+        if t not in BUSINESS_GLOSSARY["metrics"]
+        and t not in TEXT_ENTITY_HINTS
+        and t not in STOPWORDS
+    ]
+    for token in tokens:
+        if token.isdigit() or re.fullmatch(r"20\d{2}", token):
+            continue
+        cleaned = _normalize_business_term(_clean_candidate_phrase(token))
+        if len(cleaned) >= 4 and cleaned.lower() not in STOPWORDS and cleaned not in terms:
+            terms.append(cleaned)
+        if len(terms) >= 3:
+            break
+
+    return terms[:4]
+
 
     for quoted in re.findall(r"[\"“”'\']([^\"“”'\']{2,60})[\"“”'\']", question):
         cleaned = _normalize_business_term(quoted)
@@ -481,6 +553,32 @@ def _sanitize_sales_aliases(sql: str, question: str) -> str:
     return fixed
 
 
+def _infer_no_sql_reason(question: str, intent: NormalizedIntent, context: ContextPackage, sql: str | None = None, validation_errors: Optional[List[str]] = None) -> str:
+    q_low = question.lower().strip()
+    if sql and sql.strip() == "NO_SQL":
+        if not context.selected_table_names:
+            return "No se encontró un contexto de tablas suficiente para construir la consulta."
+        if intent.domain not in {t.get("domain", "") for t in context.tables} and intent.domain != "ventas":
+            return "El dominio solicitado no quedó bien cubierto por el contexto disponible."
+        if "estados financieros" in q_low and "plantaciones" in q_low:
+            return "La solicitud es ambigua y requiere precisar la métrica o la estructura exacta del informe financiero."
+        if intent.search_terms:
+            return f"No se pudo mapear con seguridad el término buscado ({', '.join(intent.search_terms)}) a columnas y joins válidos."
+        return "No fue posible construir una consulta confiable solo con las tablas, columnas y joins permitidos."
+    if validation_errors:
+        first = validation_errors[0]
+        if "Tablas no permitidas" in first:
+            return "La consulta intentó usar tablas fuera del catálogo permitido."
+        if "Columnas no permitidas" in first:
+            return "La consulta intentó usar columnas fuera del catálogo permitido."
+        if "JOIN no permitido" in first:
+            return "La consulta propuso joins que no están aprobados en el contexto."
+        if "DIM_FECHA" in first or "FECHA" in first:
+            return "La consulta no respetó la regla obligatoria de filtrar fechas con DIM_FECHA."
+        return "La consulta no pasó la validación del esquema permitido."
+    return "No fue posible generar SQL confiable con el contexto actual."
+
+
 def build_client(base_url: str = "http://localhost:11434/v1", api_key: str = "ollama"):
     from openai import OpenAI
     return OpenAI(base_url=base_url, api_key=api_key)
@@ -502,6 +600,7 @@ def generate_sql(question: str, model: str = "qwen2.5-coder:3b", client: Optiona
     )
     sql = response.choices[0].message.content.strip()
     sql = _sanitize_sales_aliases(sql, question)
+    no_sql_reason = _infer_no_sql_reason(question, intent, context, sql=sql if sql.strip() == "NO_SQL" else None)
     return {
         "question": question,
         "intent": intent.__dict__,
@@ -512,6 +611,7 @@ def generate_sql(question: str, model: str = "qwen2.5-coder:3b", client: Optiona
         "preferred_name_columns": context.preferred_name_columns,
         "search_terms": context.search_terms,
         "sql": sql,
+        "no_sql_reason": no_sql_reason if sql.strip() == "NO_SQL" else "",
     }
 
 
@@ -566,7 +666,14 @@ def validate_sql(sql: str) -> Dict[str, Any]:
     raw = sql.strip()
 
     if raw == "NO_SQL":
-        return {"valid": False, "errors": ["LLM devolvió NO_SQL"], "sql": raw, "tables": [], "columns": []}
+        return {
+            "valid": False,
+            "errors": ["LLM devolvió NO_SQL"],
+            "sql": raw,
+            "tables": [],
+            "columns": [],
+            "no_sql_reason": "El modelo no encontró una consulta suficientemente segura con el contexto permitido.",
+        }
 
     if not re.match(r"^\s*SELECT\b", raw, flags=re.IGNORECASE):
         errors.append("La sentencia no inicia con SELECT.")

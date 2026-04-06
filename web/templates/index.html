@@ -27,7 +27,7 @@
       </div>
 
       <div class="note">
-        Reglas activas: contexto máximo 2500 caracteres, uso de columnas NOM_/DESC_ para búsqueda y respuesta, rango por defecto desde enero de 2025 hasta hoy usando DIM_FECHA, y filtros de texto por semejanza en MAYÚSCULAS. En reportes de ventas, los aliases deben mostrarse como VENTAS o TOTAL_VENTAS salvo solicitud explícita de AUTOCONSUMO.
+        Reglas activas: contexto máximo 3000 caracteres, uso de columnas NOM_/DESC_ para búsqueda y respuesta, rango por defecto desde enero de 2025 hasta hoy usando DIM_FECHA, y filtros de texto por semejanza en MAYÚSCULAS. Los verbos de instrucción como GENERA o MUESTRA no deben convertirse en filtros. En reportes de ventas, los aliases deben mostrarse como VENTAS o TOTAL_VENTAS salvo solicitud explícita de AUTOCONSUMO.
       </div>
 
       <div class="actions">
@@ -65,7 +65,7 @@
           <pre id="validation"></pre>
         </div>
         <div class="block">
-          <h2>Corrección</h2>
+          <h2>NO_SQL / Corrección</h2>
           <pre id="repair"></pre>
         </div>
       </div>
@@ -138,6 +138,7 @@
         $('searchTerms').textContent = pretty(data.search_terms);
         $('validation').textContent = pretty(data.validation);
         $('repair').textContent = pretty({
+          no_sql_reason: data.no_sql_reason,
           repaired_sql: data.repaired_sql,
           repaired_validation: data.repaired_validation
         });
