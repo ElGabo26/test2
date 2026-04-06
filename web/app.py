@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, render_template, request
 
-from src.sql_rag_pipeline import generate_sql, repair_sql, validate_sql
+from sql_rag_pipeline import generate_sql, repair_sql, validate_sql
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
