@@ -27,7 +27,7 @@
       </div>
 
       <div class="note">
-        Reglas activas: contexto máximo 2500 caracteres, uso de columnas NOM_/DESC_ para búsqueda y respuesta, y rango por defecto desde enero de 2025 hasta hoy usando DIM_FECHA.
+        Reglas activas: contexto máximo 2500 caracteres, uso de columnas NOM_/DESC_ para búsqueda y respuesta, rango por defecto desde enero de 2025 hasta hoy usando DIM_FECHA, y filtros de texto por semejanza en MAYÚSCULAS. En reportes de ventas, los aliases deben mostrarse como VENTAS o TOTAL_VENTAS salvo solicitud explícita de AUTOCONSUMO.
       </div>
 
       <div class="actions">
@@ -52,6 +52,11 @@
           <h2>Columnas NOM_/DESC_ priorizadas</h2>
           <pre id="nameColumns"></pre>
         </div>
+      </div>
+
+      <div class="block">
+        <h2>Términos de búsqueda detectados</h2>
+        <pre id="searchTerms"></pre>
       </div>
 
       <div class="grid-two">
@@ -110,6 +115,7 @@
       $('intent').textContent = '';
       $('tablesUsed').textContent = '';
       $('nameColumns').textContent = '';
+      $('searchTerms').textContent = '';
       $('promptChars').textContent = '';
 
       try {
@@ -129,6 +135,7 @@
           tablas_sql_reparado: data.repaired_used_tables
         });
         $('nameColumns').textContent = pretty(data.preferred_name_columns);
+        $('searchTerms').textContent = pretty(data.search_terms);
         $('validation').textContent = pretty(data.validation);
         $('repair').textContent = pretty({
           repaired_sql: data.repaired_sql,

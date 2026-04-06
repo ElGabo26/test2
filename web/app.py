@@ -98,6 +98,7 @@ def api_generate():
                 "context": result["context"],
                 "selected_tables": result["selected_tables"],
                 "preferred_name_columns": result["preferred_name_columns"],
+                "search_terms": result["search_terms"],
                 "sql": result["sql"],
                 "validation": validation,
                 "used_tables": validation.get("tables", []),

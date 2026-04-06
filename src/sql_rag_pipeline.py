@@ -17,8 +17,14 @@ CURRENT_DATE = date.today().isoformat()
 STOPWORDS = {
     "de", "la", "el", "los", "las", "del", "por", "para", "y", "o", "en", "a", "un", "una",
     "con", "sin", "que", "cuanto", "cuántos", "cual", "cuál", "mes", "año", "fecha", "hasta",
-    "desde", "hoy", "actual", "totales", "total", "ventas", "venta", "mostrar", "dame", "quiero"
+    "desde", "hoy", "actual", "totales", "total", "ventas", "venta", "mostrar", "dame", "quiero",
+    "informe", "reporte", "nombre", "marca", "familia", "string", "buscar", "busca", "requiero"
 }
+TEXT_ENTITY_HINTS = {
+    "marca", "familia", "empresa", "compania", "compañia", "unidad", "negocio", "cuenta", "canal",
+    "ruta", "zona", "agencia", "material", "producto", "cliente", "articulo", "artículo", "linea", "línea"
+}
+EXPLICIT_AUTOCONSUMO_TERMS = {"autoconsumo", "autoconsumos", "venta_autoconsumo", "venta autoconsumo"}
 
 
 def load_json(path: Path) -> Dict[str, Any]:
@@ -50,6 +56,8 @@ class NormalizedIntent:
     filters: List[str]
     date_filter_sql: str
     date_filter_label: str
+    search_terms: List[str]
+    explicit_autoconsumo: bool = False
     requires_dim_fecha: bool = True
 
 
@@ -63,6 +71,7 @@ class ContextPackage:
     context_text: str
     selected_table_names: List[str]
     preferred_name_columns: Dict[str, List[str]]
+    search_terms: List[str]
 
 
 @dataclass
@@ -80,6 +89,49 @@ def _tokenize(text: str) -> List[str]:
 def _question_tokens(question: str) -> List[str]:
     tokens = [t for t in _tokenize(question) if len(t) > 2 and t not in STOPWORDS and not re.fullmatch(r"20\d{2}", t)]
     return tokens
+
+
+def _normalize_business_term(term: str) -> str:
+    return re.sub(r"\s+", " ", term.strip()).upper()
+
+
+def _extract_search_terms(question: str) -> List[str]:
+    q_low = question.lower()
+    terms: List[str] = []
+
+    for quoted in re.findall(r"[\"“”'\']([^\"“”'\']{2,60})[\"“”'\']", question):
+        cleaned = _normalize_business_term(quoted)
+        if cleaned and cleaned not in terms:
+            terms.append(cleaned)
+
+    patterns = [
+        r"(?:marca|familia|empresa|compa(?:ñ|n)ia|unidad de negocio|unidad|cuenta|canal|ruta|zona|agencia|material|producto|cliente)\s+(?:de\s+|del\s+|la\s+|el\s+)?([a-zA-Z0-9áéíóúñÑ_\- ]{2,50})",
+        r"(?:que contenga|parecido a|similar a|semejante a)\s+([a-zA-Z0-9áéíóúñÑ_\- ]{2,50})",
+    ]
+    for pattern in patterns:
+        for match in re.findall(pattern, q_low, flags=re.IGNORECASE):
+            candidate = re.split(r"\b(?:desde|hasta|en|por|con|sin|y|o)\b", match, maxsplit=1)[0]
+            cleaned = _normalize_business_term(candidate)
+            if cleaned and len(cleaned) > 1 and cleaned not in terms:
+                terms.append(cleaned)
+
+    if not terms:
+        tokens = [t for t in _question_tokens(question) if t not in BUSINESS_GLOSSARY["metrics"] and t not in TEXT_ENTITY_HINTS]
+        for token in tokens:
+            if token.isdigit() or re.fullmatch(r"20\d{2}", token):
+                continue
+            cleaned = _normalize_business_term(token)
+            if len(cleaned) >= 4 and cleaned not in terms:
+                terms.append(cleaned)
+            if len(terms) >= 3:
+                break
+
+    return terms[:4]
+
+
+def _has_explicit_autoconsumo(question: str) -> bool:
+    q_low = question.lower()
+    return any(term in q_low for term in EXPLICIT_AUTOCONSUMO_TERMS)
 
 
 def _domain_from_question(q_low: str) -> str:
@@ -122,11 +174,15 @@ def normalize_intent(question: str) -> NormalizedIntent:
         if word in q_low:
             dimensions.extend(cols)
 
+    explicit_autoconsumo = _has_explicit_autoconsumo(q)
     if not metrics and domain == "ventas":
         metrics.append("VENTA_AUTOCONSUMO")
 
+    search_terms = _extract_search_terms(q)
     date_filter_sql, date_filter_label = _normalize_date_filter(q_low)
     filters = [date_filter_label, "Siempre usar JOIN con DIM_FECHA para filtrar fechas"]
+    if search_terms:
+        filters.append(f"Buscar textos por semejanza en mayúsculas: {', '.join(search_terms)}")
 
     return NormalizedIntent(
         question=q,
@@ -136,6 +192,8 @@ def normalize_intent(question: str) -> NormalizedIntent:
         filters=filters,
         date_filter_sql=date_filter_sql,
         date_filter_label=date_filter_label,
+        search_terms=search_terms,
+        explicit_autoconsumo=explicit_autoconsumo,
     )
 
 
@@ -283,6 +341,8 @@ def select_relevant_context(intent: NormalizedIntent, max_tables: int = 5) -> Co
     rules = [r["rule"] for r in BUSINESS_RULES["rules"] if r["domain"] in {"global", intent.domain}][:6]
     rules.extend([
         "Las columnas que empiezan con NOM_ o DESC_ contienen nombres de negocio. Úsalas para buscar marcas, empresas, unidades, cuentas, canales y también para devolver etiquetas legibles.",
+        "Cuando el usuario busque un nombre, marca, familia o string, convierte el término a MAYÚSCULAS y busca por semejanza con UPPER(columna) LIKE '%TERMINO%' en columnas NOM_/DESC_, no por igualdad exacta.",
+        "En informes de ventas, no exponer aliases ni encabezados con AUTOCONSUMO; usar VENTAS, TOTAL_VENTAS o nombres neutros, salvo que el usuario lo solicite explícitamente.",
         f"Siempre hacer JOIN con DIM_FECHA y filtrar con {intent.date_filter_sql}.",
     ])
     examples = [e for e in SQL_EXAMPLES if e["domain"] == intent.domain][:2]
@@ -322,13 +382,14 @@ def select_relevant_context(intent: NormalizedIntent, max_tables: int = 5) -> Co
         f"{tbl.replace('DDM_ERP.', '')}:{','.join(cols[:4])}"
         for tbl, cols in preferred_name_columns.items()
     )
+    search_block = "|".join(intent.search_terms) if intent.search_terms else "-"
 
     context_text = (
         f"dom={intent.domain}; fechas={intent.date_filter_sql}; "
         f"tablas={' | '.join(table_blocks)}; "
         f"joins={' | '.join(join_blocks)}; "
-        f"nom_desc={names_block}; "
-        f"reglas={' | '.join(rules[:5])}; "
+        f"nom_desc={names_block}; buscar={search_block}; "
+        f"reglas={' | '.join(rules[:6])}; "
         f"ej={example_block}"
     )
 
@@ -341,16 +402,30 @@ def select_relevant_context(intent: NormalizedIntent, max_tables: int = 5) -> Co
         context_text=context_text,
         selected_table_names=selected_names,
         preferred_name_columns=preferred_name_columns,
+        search_terms=intent.search_terms,
     )
 
 
 def build_prompt(question: str, context: ContextPackage, max_chars: int = MAX_PROMPT_CHARS) -> str:
+    q_low = question.lower()
+    explicit_autoconsumo = _has_explicit_autoconsumo(question)
+    search_clause = ""
+    if context.search_terms:
+        terms = ", ".join(context.search_terms)
+        search_clause = (
+            f" Si hay filtros de texto o nombres, busca por semejanza usando UPPER(NOM_/DESC_) LIKE con estos términos en mayúsculas: {terms}."
+        )
+    sales_alias_clause = ""
+    if "venta" in q_low and not explicit_autoconsumo:
+        sales_alias_clause = " En informes de ventas, no uses AUTOCONSUMO como alias o encabezado; aliasa la métrica como VENTAS o TOTAL_VENTAS."
     base = (
         "Genera solo SQL MySQL/SingleStore. Solo SELECT. Usa únicamente tablas, columnas y joins del CTX. "
         "Siempre usa JOIN con DIM_FECHA para filtrar fechas. Si la pregunta no trae rango, usa DF.FECHA BETWEEN "
         f"'{DEFAULT_DATE_START}' AND '{CURRENT_DATE}'. "
         "Las columnas NOM_* y DESC_* contienen nombres conocidos de negocio; úsalas para buscar términos del usuario y "
-        "para devolver nombres legibles en SELECT y GROUP BY. Si no alcanza el contexto, responde NO_SQL. Agrega LIMIT 1000 si falta."
+        "para devolver nombres legibles en SELECT y GROUP BY. No uses igualdad exacta para nombres; usa semejanza con LIKE y UPPER. "
+        "Si no alcanza el contexto, responde NO_SQL. Agrega LIMIT 1000 si falta."
+        f"{search_clause}{sales_alias_clause}"
     )
     prompt = f"{base}\nCTX:{context.context_text}\nQ:{question}\nSQL:"
     if len(prompt) <= max_chars:
@@ -387,6 +462,25 @@ def build_prompt(question: str, context: ContextPackage, max_chars: int = MAX_PR
     return f"{base}\nCTX:{ultra}\nQ:{question}\nSQL:"[:max_chars]
 
 
+def _sanitize_sales_aliases(sql: str, question: str) -> str:
+    if sql.strip() == "NO_SQL" or _has_explicit_autoconsumo(question):
+        return sql
+    if "venta" not in question.lower():
+        return sql
+
+    replacements = [
+        (r"\bAS\s+AUTOCONSUMOS\b", "AS VENTAS"),
+        (r"\bAS\s+AUTOCONSUMO\b", "AS VENTAS"),
+        (r"\bAS\s+VENTA_AUTOCONSUMO\b", "AS VENTAS"),
+        (r"\bAS\s+TOTAL_AUTOCONSUMO\b", "AS TOTAL_VENTAS"),
+        (r"\bAS\s+TOTAL_AUTOCONSUMOS\b", "AS TOTAL_VENTAS"),
+    ]
+    fixed = sql
+    for pattern, repl in replacements:
+        fixed = re.sub(pattern, repl, fixed, flags=re.IGNORECASE)
+    return fixed
+
+
 def build_client(base_url: str = "http://localhost:11434/v1", api_key: str = "ollama"):
     from openai import OpenAI
     return OpenAI(base_url=base_url, api_key=api_key)
@@ -407,6 +501,7 @@ def generate_sql(question: str, model: str = "qwen2.5-coder:3b", client: Optiona
         ]
     )
     sql = response.choices[0].message.content.strip()
+    sql = _sanitize_sales_aliases(sql, question)
     return {
         "question": question,
         "intent": intent.__dict__,
@@ -415,6 +510,7 @@ def generate_sql(question: str, model: str = "qwen2.5-coder:3b", client: Optiona
         "prompt_chars": len(prompt),
         "selected_tables": context.selected_table_names,
         "preferred_name_columns": context.preferred_name_columns,
+        "search_terms": context.search_terms,
         "sql": sql,
     }
 
@@ -529,6 +625,8 @@ def repair_sql(question: str, bad_sql: str, validation_errors: List[str], model:
     prompt = (
         "Corrige el SQL usando solo el contexto. Solo SELECT. Siempre usa JOIN con DIM_FECHA y filtra con "
         f"{intent.date_filter_sql}. Usa columnas NOM_/DESC_ para nombres legibles y para buscar términos del usuario. "
+        "Para textos y nombres usa semejanza con UPPER(columna) LIKE '%TERMINO%' y términos en mayúsculas. "
+        "Si es un informe de ventas, no uses aliases AUTOCONSUMO salvo petición explícita. "
         "Si no puedes corregirlo con seguridad, devuelve NO_SQL. "
         f"Errores:{' | '.join(validation_errors)} "
         f"CTX:{context.context_text} "
@@ -544,7 +642,7 @@ def repair_sql(question: str, bad_sql: str, validation_errors: List[str], model:
             {"role": "user", "content": prompt}
         ]
     )
-    return response.choices[0].message.content.strip()
+    return _sanitize_sales_aliases(response.choices[0].message.content.strip(), question)
 
 
 if __name__ == "__main__":
