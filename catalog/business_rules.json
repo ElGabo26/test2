@@ -46,14 +46,14 @@
       "rule": "En presupuesto, si DTC.NOM_TIPO_CLASIFICACION es nulo se reemplaza por FRUTA."
     },
     {
-      "domain": "global",
-      "name": "uppercase_similarity_search",
-      "rule": "Para nombres, marcas, familias y otros textos de negocio, convertir los términos a MAYÚSCULAS y buscar por semejanza con UPPER(columna) LIKE '%TERMINO%' sobre columnas NOM_ o DESC_."
-    },
-    {
       "domain": "ventas",
       "name": "sales_alias_without_autoconsumo",
       "rule": "En informes de ventas, no mostrar aliases o encabezados con AUTOCONSUMO salvo que el usuario lo pida explícitamente; usar VENTAS o TOTAL_VENTAS."
+    },
+    {
+      "domain": "global",
+      "name": "gated_similarity_search",
+      "rule": "La búsqueda por semejanza con UPPER(columna) LIKE solo se permite cuando el detector identifica una entidad categórica explícita; usar MAYÚSCULAS y solo columnas NOM_ o DESC_ candidatas."
     }
   ]
 }

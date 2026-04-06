@@ -10,11 +10,12 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.sql_rag_pipeline import generate_sql, repair_sql, validate_sql, build_client
+from src.sql_rag_pipeline import build_client, generate_sql, repair_sql, validate_sql
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
+DEFAULT_DETECTOR_MODEL = os.getenv("OLLAMA_DETECTOR_MODEL", DEFAULT_MODEL)
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
 
@@ -36,7 +37,7 @@ def _friendly_error(exc: Exception) -> str:
 
 @app.get("/")
 def index():
-    return render_template("index.html", default_model=DEFAULT_MODEL)
+    return render_template("index.html", default_model=DEFAULT_MODEL, default_detector_model=DEFAULT_DETECTOR_MODEL)
 
 
 @app.get("/api/health")
@@ -44,11 +45,12 @@ def api_health():
     try:
         client = build_client(base_url=OLLAMA_BASE_URL, api_key=OLLAMA_API_KEY)
         models = client.models.list()
-        names = [getattr(m, 'id', None) or getattr(m, 'model', None) for m in getattr(models, 'data', [])]
+        names = [getattr(m, "id", None) or getattr(m, "model", None) for m in getattr(models, "data", [])]
         return jsonify({
             "ok": True,
             "ollama_base_url": OLLAMA_BASE_URL,
             "models": [n for n in names if n][:20],
+            "detector_model": DEFAULT_DETECTOR_MODEL,
         })
     except Exception as exc:
         return jsonify({
@@ -64,6 +66,7 @@ def api_generate():
     payload = request.get_json(silent=True) or {}
     question = str(payload.get("question", "")).strip()
     model = str(payload.get("model", DEFAULT_MODEL)).strip() or DEFAULT_MODEL
+    detector_model = str(payload.get("detector_model", DEFAULT_DETECTOR_MODEL)).strip() or DEFAULT_DETECTOR_MODEL
     autorepair = bool(payload.get("autorepair", True))
 
     if not question:
@@ -71,8 +74,8 @@ def api_generate():
 
     try:
         client = build_client(base_url=OLLAMA_BASE_URL, api_key=OLLAMA_API_KEY)
-        result = generate_sql(question=question, model=model, client=client)
-        validation = validate_sql(result["sql"])
+        result = generate_sql(question=question, model=model, client=client, detector_model=detector_model)
+        validation = validate_sql(result["sql"], result.get("validation_context"))
 
         repaired_sql = None
         repaired_validation = None
@@ -85,34 +88,35 @@ def api_generate():
                 validation_errors=validation["errors"],
                 model=model,
                 client=client,
+                detector_model=detector_model,
             )
-            repaired_validation = validate_sql(repaired_sql)
+            repaired_validation = validate_sql(repaired_sql, result.get("validation_context"))
             if repaired_sql == "NO_SQL":
                 no_sql_reason = (repaired_validation or {}).get("no_sql_reason", "") or "La corrección automática no logró producir un SQL seguro."
         elif result["sql"] == "NO_SQL":
             no_sql_reason = result.get("no_sql_reason", "") or validation.get("no_sql_reason", "")
 
-        return jsonify(
-            {
-                "ok": True,
-                "question": question,
-                "model": model,
-                "prompt": result["prompt"],
-                "prompt_chars": result["prompt_chars"],
-                "intent": result["intent"],
-                "context": result["context"],
-                "selected_tables": result["selected_tables"],
-                "preferred_name_columns": result["preferred_name_columns"],
-                "search_terms": result["search_terms"],
-                "sql": result["sql"],
-                "no_sql_reason": no_sql_reason,
-                "validation": validation,
-                "used_tables": validation.get("tables", []),
-                "repaired_sql": repaired_sql,
-                "repaired_validation": repaired_validation,
-                "repaired_used_tables": (repaired_validation or {}).get("tables", []) if repaired_validation else [],
-            }
-        )
+        return jsonify({
+            "ok": True,
+            "question": question,
+            "model": model,
+            "detector_model": detector_model,
+            "prompt": result["prompt"],
+            "prompt_chars": result["prompt_chars"],
+            "intent": result["intent"],
+            "context": result["context"],
+            "selected_tables": result["selected_tables"],
+            "preferred_name_columns": result["preferred_name_columns"],
+            "search_terms": result["search_terms"],
+            "detected_entities": result["detected_entities"],
+            "sql": result["sql"],
+            "no_sql_reason": no_sql_reason,
+            "validation": validation,
+            "used_tables": validation.get("tables", []),
+            "repaired_sql": repaired_sql,
+            "repaired_validation": repaired_validation,
+            "repaired_used_tables": (repaired_validation or {}).get("tables", []) if repaired_validation else [],
+        })
     except Exception as exc:
         return jsonify({
             "ok": False,

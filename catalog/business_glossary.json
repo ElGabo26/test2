@@ -88,5 +88,74 @@
       "movimiento",
       "inventario"
     ]
-  }
+  },
+  "entity_types": {
+    "marca": [
+      "MARCA"
+    ],
+    "familia": [
+      "FAMILIA"
+    ],
+    "empresa": [
+      "COMPANIA",
+      "EMPRESA",
+      "CIA"
+    ],
+    "unidad_negocio": [
+      "UNID_NEGOCIO",
+      "UNIDAD_NEGOCIO",
+      "NEGOCIO"
+    ],
+    "cuenta": [
+      "CUENTA",
+      "CTA"
+    ],
+    "cliente": [
+      "CLIENTE"
+    ],
+    "producto": [
+      "PRODUCTO",
+      "MATERIAL",
+      "ARTICULO"
+    ],
+    "plantacion": [
+      "PLANTACION"
+    ],
+    "canal": [
+      "CANAL"
+    ],
+    "ruta": [
+      "RUTA"
+    ],
+    "zona": [
+      "ZONA"
+    ],
+    "agencia": [
+      "AGENCIA"
+    ],
+    "material": [
+      "MATERIAL"
+    ],
+    "origen": [
+      "ORIGEN"
+    ]
+  },
+  "command_words": [
+    "consulta",
+    "dame",
+    "genera",
+    "generar",
+    "genere",
+    "mostrar",
+    "muestra",
+    "muestrame",
+    "muéstrame",
+    "necesito",
+    "obten",
+    "obtener",
+    "obtén",
+    "quiero",
+    "requiero",
+    "trae"
+  ]
 }

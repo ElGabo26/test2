@@ -10,24 +10,29 @@
   <main class="page">
     <section class="panel left">
       <h1>SQL Agent RAG</h1>
-      <p class="muted">Generación de SQL con Ollama vía OpenAI-compatible, contexto comprimido, uso forzado de DIM_FECHA y validación.</p>
+      <p class="muted">Generación de SQL con Ollama vía OpenAI-compatible, detección previa de entidades categóricas, uso forzado de DIM_FECHA y validación.</p>
 
       <label for="question">Pregunta</label>
-      <textarea id="question" rows="7" placeholder="Ejemplo: ventas por canal y marca"></textarea>
+      <textarea id="question" rows="7" placeholder="Ejemplo: ventas de la marca TONI por mes"></textarea>
 
       <div class="row">
         <div class="field">
-          <label for="model">Modelo</label>
+          <label for="model">Modelo generador</label>
           <input id="model" value="{{ default_model }}">
         </div>
-        <label class="check">
-          <input id="autorepair" type="checkbox" checked>
-          Intentar corrección automática
-        </label>
+        <div class="field">
+          <label for="detectorModel">Modelo detector</label>
+          <input id="detectorModel" value="{{ default_detector_model }}">
+        </div>
       </div>
 
+      <label class="check">
+        <input id="autorepair" type="checkbox" checked>
+        Intentar corrección automática
+      </label>
+
       <div class="note">
-        Reglas activas: contexto máximo 3000 caracteres, uso de columnas NOM_/DESC_ para búsqueda y respuesta, rango por defecto desde enero de 2025 hasta hoy usando DIM_FECHA, y filtros de texto por semejanza en MAYÚSCULAS. Los verbos de instrucción como GENERA o MUESTRA no deben convertirse en filtros. En reportes de ventas, los aliases deben mostrarse como VENTAS o TOTAL_VENTAS salvo solicitud explícita de AUTOCONSUMO.
+        Reglas activas: contexto máximo 3000 caracteres, siempre usar DIM_FECHA, y la búsqueda semejante de strings solo se habilita si el detector encuentra una entidad categórica explícita como marca, familia, empresa o unidad de negocio. En ese caso, el valor se busca en MAYÚSCULAS y solo sobre columnas NOM_/DESC_ candidatas.
       </div>
 
       <div class="actions">
@@ -54,9 +59,15 @@
         </div>
       </div>
 
-      <div class="block">
-        <h2>Términos de búsqueda detectados</h2>
-        <pre id="searchTerms"></pre>
+      <div class="grid-two">
+        <div class="block">
+          <h2>Entidades detectadas</h2>
+          <pre id="detectedEntities"></pre>
+        </div>
+        <div class="block">
+          <h2>Términos de búsqueda</h2>
+          <pre id="searchTerms"></pre>
+        </div>
       </div>
 
       <div class="grid-two">
@@ -89,7 +100,6 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-
     function pretty(value) {
       if (value == null || value === '') return '—';
       if (typeof value === 'string') return value;
@@ -99,6 +109,7 @@
     async function generate() {
       const question = $('question').value.trim();
       const model = $('model').value.trim();
+      const detector_model = $('detectorModel').value.trim();
       const autorepair = $('autorepair').checked;
 
       if (!question) {
@@ -107,24 +118,17 @@
       }
 
       $('status').textContent = 'Generando...';
-      $('sql').textContent = '';
-      $('validation').textContent = '';
-      $('repair').textContent = '';
-      $('prompt').textContent = '';
-      $('context').textContent = '';
-      $('intent').textContent = '';
-      $('tablesUsed').textContent = '';
-      $('nameColumns').textContent = '';
-      $('searchTerms').textContent = '';
+      for (const id of ['sql','validation','repair','prompt','context','intent','tablesUsed','nameColumns','searchTerms','detectedEntities']) {
+        $(id).textContent = '';
+      }
       $('promptChars').textContent = '';
 
       try {
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({question, model, autorepair})
+          body: JSON.stringify({question, model, detector_model, autorepair})
         });
-
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || 'Error desconocido');
 
@@ -136,6 +140,7 @@
         });
         $('nameColumns').textContent = pretty(data.preferred_name_columns);
         $('searchTerms').textContent = pretty(data.search_terms);
+        $('detectedEntities').textContent = pretty(data.detected_entities);
         $('validation').textContent = pretty(data.validation);
         $('repair').textContent = pretty({
           no_sql_reason: data.no_sql_reason,
